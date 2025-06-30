@@ -1,7 +1,7 @@
 import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
-from shiny import App, ui, render
+from shiny import App, ui, render, reactive
 from shinywidgets import output_widget, render_plotly, render_widget
 from palmerpenguins import load_penguins
 
@@ -69,22 +69,22 @@ def server(input, output, session):
 
     @render.data_frame
     def data_table():
-        return penguins_df[
-            penguins_df["species"].isin(input.selected_species_list())
+        return filtered_data()[
+            filtered_data()["species"].isin(input.selected_species_list())
         ]
 
     @render.data_frame
     def data_grid():
-        return penguins_df[
-            penguins_df["species"].isin(input.selected_species_list())
+        return filtered_data()[
+            filtered_data()["species"].isin(input.selected_species_list())
         ]
 
     @render_plotly
     def plotly_histogram():
         col = input.selected_attribute()
         bins = input.plotly_bin_count() or 10
-        filtered = penguins_df[
-            penguins_df["species"].isin(input.selected_species_list())
+        filtered = filtered_data()[
+            filtered_data()["species"].isin(input.selected_species_list())
         ]
         fig = px.histogram(
             filtered,
@@ -99,8 +99,8 @@ def server(input, output, session):
     def seaborn_histogram():
         col = input.selected_attribute()
         bins = input.seaborn_bin_count() or 20
-        filtered = penguins_df[
-            penguins_df["species"].isin(input.selected_species_list())
+        filtered = filtered_data()[
+            filtered_data()["species"].isin(input.selected_species_list())
         ]
         fig, ax = plt.subplots()
         sns.histplot(
@@ -116,8 +116,8 @@ def server(input, output, session):
 
     @render_plotly
     def plotly_scatterplot():
-        filtered = penguins_df[
-            penguins_df["species"].isin(input.selected_species_list())
+        filtered = filtered_data()[
+            filtered_data()["species"].isin(input.selected_species_list())
         ]
         fig = px.scatter(
             filtered,
@@ -132,6 +132,19 @@ def server(input, output, session):
             },
         )
         return fig
+
+# --------------------------------------------------------
+# Reactive calculations and effects
+# --------------------------------------------------------
+
+# Add a reactive calculation to filter the data
+# By decorating the function with @reactive, we can use the function to filter the data
+# The function will be called whenever an input functions used to generate that output changes.
+# Any output that depends on the reactive function (e.g., filtered_data()) will be updated when the data changes.
+
+@reactive.calc
+def filtered_data():
+    return penguins_df
 
 
 app = App(app_ui, server)
