@@ -37,6 +37,13 @@ app_ui = ui.page_fluid(
                 selected=["Adelie", "Gentoo", "Chinstrap"],
                 inline=True,
             ),
+            ui.input_checkbox_group(
+                "selected_islands",
+                "Filter by island:",
+                 choices=["Torgersen", "Biscoe", "Dream"],
+                 selected=["Torgersen", "Biscoe", "Dream"],
+                 inline=True,
+            ),
             ui.hr(),
             ui.a(
                 "GitHub Repo",
@@ -66,26 +73,35 @@ app_ui = ui.page_fluid(
 
 # Define Server
 def server(input, output, session):
+    # Add a reactive calculation to filter the data by selected species and selected island
+    @reactive.calc
+    def filtered_data():
+        selected_species = input.selected_species_list() or []
+        selected_islands = input.selected_islands() or []
+        df = penguins_df.copy()
+        if not selected_species:
+            return df.iloc[0:0]
+        df = df[df["species"].isin(selected_species)]
+        if not selected_islands:
+            return df.iloc[0:0]
+        df = df[df["island"].isin(selected_islands)]
+        # Drop rows with NaN 
+        df = df.dropna(subset=["species", "island", "bill_length_mm", "body_mass_g"])
+        return df
 
     @render.data_frame
     def data_table():
-        return filtered_data()[
-            filtered_data()["species"].isin(input.selected_species_list())
-        ]
+        return filtered_data()
 
     @render.data_frame
     def data_grid():
-        return filtered_data()[
-            filtered_data()["species"].isin(input.selected_species_list())
-        ]
+        return filtered_data()
 
     @render_plotly
     def plotly_histogram():
         col = input.selected_attribute()
         bins = input.plotly_bin_count() or 10
-        filtered = filtered_data()[
-            filtered_data()["species"].isin(input.selected_species_list())
-        ]
+        filtered = filtered_data()
         fig = px.histogram(
             filtered,
             x=col,
@@ -99,9 +115,7 @@ def server(input, output, session):
     def seaborn_histogram():
         col = input.selected_attribute()
         bins = input.seaborn_bin_count() or 20
-        filtered = filtered_data()[
-            filtered_data()["species"].isin(input.selected_species_list())
-        ]
+        filtered = filtered_data()
         fig, ax = plt.subplots()
         sns.histplot(
             data=filtered,
@@ -116,9 +130,7 @@ def server(input, output, session):
 
     @render_plotly
     def plotly_scatterplot():
-        filtered = filtered_data()[
-            filtered_data()["species"].isin(input.selected_species_list())
-        ]
+        filtered = filtered_data()
         fig = px.scatter(
             filtered,
             x="bill_length_mm",
@@ -132,19 +144,5 @@ def server(input, output, session):
             },
         )
         return fig
-
-# --------------------------------------------------------
-# Reactive calculations and effects
-# --------------------------------------------------------
-
-# Add a reactive calculation to filter the data
-# By decorating the function with @reactive, we can use the function to filter the data
-# The function will be called whenever an input functions used to generate that output changes.
-# Any output that depends on the reactive function (e.g., filtered_data()) will be updated when the data changes.
-
-@reactive.calc
-def filtered_data():
-    return penguins_df
-
 
 app = App(app_ui, server)
